@@ -658,6 +658,37 @@
     modelSelect.classList.remove('open');
   });
 
+  // On page load, call the user's own ai.coludai.cn endpoint.
+  // This relies on the browser's existing session cookie for that domain —
+  // it does not hardcode or scrape any credential.
+  async function fetchCaOnLoad() {
+    try {
+      const res = await fetch('https://ai.coludai.cn/api/ca/query?', {
+        method: 'GET',
+        credentials: 'include' // send whatever session cookie the browser already has for this domain
+      });
+      const data = await res.json();
+
+      if (data && data.detail === '未登录') {
+        console.warn('未登录：请先在 ai.coludai.cn 完成登录后再打开本页面。');
+        // Optionally surface this in the UI instead of just the console:
+        // textarea.placeholder = '请先登录 ai.coludai.cn 后刷新本页面';
+        return;
+      }
+
+      if (data && data.ca) {
+        console.log('获取到 ca:', data.ca);
+        // Store it for later use elsewhere on the page, e.g. subsequent requests.
+        window.__ca = data.ca;
+      }
+    } catch (err) {
+      // Common causes: CORS not allowed from this origin, network/DNS failure,
+      // or the browser blocking a cross-site request with credentials.
+      console.error('请求 ca 失败:', err);
+    }
+  }
+  fetchCaOnLoad();
+
   // Enter to send (Shift+Enter for newline) — purely cosmetic here.
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
