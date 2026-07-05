@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ColudAI</title>
+<style>
+  :root {
+    --bg-sidebar: #1c1c22;
+    --bg-main: #202127;
+    --bg-input: #2c2d34;
+    --border-color: #33343c;
+    --text-primary: #f2f2f4;
+    --text-secondary: #9a9aa5;
+    --accent: #6c63ff;
+    --accent-hover: #7d74ff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-primary);
+  }
+  .app {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--bg-sidebar);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 16px;
+    border-right: 1px solid var(--border-color);
+    overflow: hidden;
+    white-space: nowrap;
+    transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.28s ease;
+  }
+  .app.collapsed .sidebar {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-color: transparent;
+  }
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .logo {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    opacity: 1;
+    transition: opacity 0.18s ease;
+  }
+  .icon-btn {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.85;
+    flex-shrink: 0;
+    transition: background 0.15s ease, opacity 0.15s ease, transform 0.2s ease;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.06); opacity: 1; }
+  .icon-btn:active { transform: scale(0.92); }
+
+  /* Floating toggle shown only when sidebar is collapsed */
+  .floating-toggle {
+    position: absolute;
+    top: 20px;
+    left: 16px;
+    z-index: 20;
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border-color);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-8px);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+  }
+  .app.collapsed .floating-toggle {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+
+  .new-dialogue-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .new-dialogue-btn:hover { background: var(--accent-hover); }
+  .new-dialogue-btn:active { transform: scale(0.98); }
+
+  .sidebar-spacer { flex: 1; }
+
+  .login-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 4px;
+    cursor: pointer;
+    border-radius: 8px;
+  }
+  .login-row:hover { background: rgba(255,255,255,0.05); }
+  .avatar-circle {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #3a3b44;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+  .login-text {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  /* Mobile overlay backdrop, used when sidebar is shown as a drawer */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 15;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  /* Main area */
+  .main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: padding-left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    gap: 12px;
+  }
+  .model-select {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+  }
+  .model-select:hover { background: rgba(255,255,255,0.06); }
+  .model-select svg.chevron { opacity: 0.7; transition: transform 0.2s ease; flex-shrink: 0; }
+  .model-select.open svg.chevron { transform: rotate(180deg); }
+
+  .model-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: 240px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+    z-index: 30;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+  }
+  .model-select.open .model-menu {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  .model-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: normal;
+  }
+  .model-option:hover { background: rgba(255,255,255,0.07); }
+  .model-option-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .model-option-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .model-option-desc {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-secondary);
+  }
+  .model-option-check {
+    color: var(--accent);
+    opacity: 0;
+    flex-shrink: 0;
+  }
+  .model-option.selected .model-option-check { opacity: 1; }
+  .model-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 6px 4px;
+  }
+  .topbar-actions {
+    display: flex;
+    gap: 18px;
+    flex-shrink: 0;
+  }
+
+  .chat-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 24px;
+    min-height: 0;
+  }
+  .hex-icon {
+    color: var(--text-secondary);
+    margin-bottom: 22px;
+  }
+  .greeting {
+    font-size: 22px;
+    font-weight: 800;
+    margin: 0 0 14px 0;
+  }
+  .subtext {
+    color: var(--text-secondary);
+    font-size: 15px;
+    line-height: 1.5;
+    max-width: 560px;
+    margin: 0;
+  }
+
+  .composer-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    flex-shrink: 0;
+    padding: 0 24px 8px;
+  }
+  .composer {
+    width: 100%;
+    max-width: 680px;
+    flex-shrink: 0;
+    background: var(--bg-input);
+    border-radius: 16px;
+    padding: 16px 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border: 1px solid transparent;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, max-width 0.28s ease;
+  }
+  .composer:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.18);
+  }
+  .composer textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    color: var(--text-primary);
+    font-size: 15px;
+    font-family: inherit;
+    min-height: 24px;
+    max-height: 220px;
+    line-height: 1.4;
+    overflow-y: auto;
+    transition: height 0.1s ease;
+  }
+  .composer textarea::placeholder { color: var(--text-secondary); }
+  .composer textarea::-webkit-scrollbar { width: 6px; }
+  .composer textarea::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+  .composer-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .attach-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .attach-btn:hover { color: var(--text-primary); background: rgba(255,255,255,0.06); }
+  .send-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #d8d8de;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #202127;
+    flex-shrink: 0;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .send-btn:hover { background: #fff; }
+  .send-btn:active { transform: scale(0.9); }
+
+  .disclaimer {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+    padding: 10px 0 20px;
+  }
+
+  /* ===== Responsive breakpoints ===== */
+
+  /* Large screens / fullscreen: let the composer breathe a bit more */
+  @media (min-width: 1400px) {
+    .composer { max-width: 760px; }
+    .subtext { max-width: 620px; }
+  }
+
+  /* Tablet: narrower sidebar, tighter composer */
+  @media (max-width: 900px) {
+    .sidebar { width: 220px; }
+    .composer { max-width: 560px; }
+    .subtext { max-width: 460px; }
+  }
+
+  /* Mobile: sidebar becomes an overlay drawer */
+  @media (max-width: 640px) {
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 260px;
+      z-index: 20;
+      transform: translateX(0);
+      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .app.collapsed .sidebar {
+      width: 260px;
+      padding: 20px 16px;
+      transform: translateX(-100%);
+      border-right-color: var(--border-color);
+    }
+    .app:not(.collapsed) .backdrop {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .floating-toggle { top: 16px; left: 12px; }
+    .topbar { padding: 14px 16px; }
+    .model-menu { min-width: 200px; max-width: calc(100vw - 32px); }
+    .chat-empty { padding: 0 16px; }
+    .greeting { font-size: 19px; }
+    .subtext { font-size: 14px; max-width: 100%; }
+    .composer-wrap { padding: 0 12px 8px; }
+    .composer { max-width: 100%; border-radius: 14px; padding: 12px 12px 10px; }
+    .disclaimer { font-size: 11px; padding: 8px 12px 16px; }
+  }
+
+  @media (max-width: 380px) {
+    .logo { font-size: 17px; }
+    .new-dialogue-btn { padding: 10px 12px; font-size: 13px; }
+    .hex-icon { width: 48px; height: 48px; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- Backdrop for mobile drawer -->
+  <div class="backdrop" id="backdrop"></div>
+
+  <!-- Floating toggle, visible only when sidebar is collapsed -->
+  <button class="icon-btn floating-toggle" id="floatingToggle" title="Open sidebar">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+      <line x1="9" y1="4" x2="9" y2="20"></line>
+    </svg>
+  </button>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">ColudAI</div>
+      <button class="icon-btn" id="sidebarToggle" title="Toggle sidebar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+          <line x1="9" y1="4" x2="9" y2="20"></line>
+        </svg>
+      </button>
+    </div>
+
+    <button class="new-dialogue-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 20h9"></path>
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+      </svg>
+      New Dialogue
+    </button>
+
+    <div class="sidebar-spacer"></div>
+
+    <div class="login-row">
+      <div class="avatar-circle">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="8" r="4"></circle>
+          <path d="M4 20c0-4 4-6 8-6s8 2 8 6"></path>
+        </svg>
+      </div>
+      <span class="login-text">Click to log in</span>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="model-select" id="modelSelect">
+        <span id="modelLabel">SAI-L6</span>
+        <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+
+        <div class="model-menu" id="modelMenu">
+          <div class="model-option selected" data-model="SAI-L6" data-desc="Fast, balanced everyday model">
+            <div class="model-option-text">
+              <span class="model-option-name">SAI-L6</span>
+              <span class="model-option-desc">Fast, balanced everyday model</span>
+            </div>
+            <svg class="model-option-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <div class="model-option" data-model="SAI-L6 Pro" data-desc="Stronger reasoning, slower replies">
+            <div class="model-option-text">
+              <span class="model-option-name">SAI-L6 Pro</span>
+              <span class="model-option-desc">Stronger reasoning, slower replies</span>
+            </div>
+            <svg class="model-option-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <div class="model-option" data-model="SAI-L6 Mini" data-desc="Lightweight, quickest responses">
+            <div class="model-option-text">
+              <span class="model-option-name">SAI-L6 Mini</span>
+              <span class="model-option-desc">Lightweight, quickest responses</span>
+            </div>
+            <svg class="model-option-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+
+          <div class="model-menu-divider"></div>
+
+          <div class="model-option" data-model="SAI-Vision" data-desc="Understands images and diagrams">
+            <div class="model-option-text">
+              <span class="model-option-name">SAI-Vision</span>
+              <span class="model-option-desc">Understands images and diagrams</span>
+            </div>
+            <svg class="model-option-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" title="Edit">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+          </svg>
+        </button>
+        <button class="icon-btn" title="View">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="chat-empty">
+      <svg class="hex-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2 21 7v10l-9 5-9-5V7l9-5Z"></path>
+      </svg>
+      <h1 class="greeting">I'm SAI, nice to meet you!</h1>
+      <p class="subtext">I can assist with programming and reading files. Please let me know, and I will do my best to help you achieve this.</p>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer">
+        <textarea id="composerInput" placeholder="Engage with the future at any time and explore endless possibilities..." rows="1"></textarea>
+        <div class="composer-footer">
+          <button class="attach-btn" title="Attach file">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95L9.83 17.42a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+          </button>
+          <button class="send-btn" title="Send">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="19" x2="12" y2="5"></line>
+              <polyline points="5 12 12 5 19 12"></polyline>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="disclaimer">SAI can also make mistakes, please check important information.</div>
+  </div>
+</div>
+
+<script>
+  const app = document.getElementById('app');
+  const backdrop = document.getElementById('backdrop');
+  const sidebarToggle = document.getElementById('sidebarToggle');
+  const floatingToggle = document.getElementById('floatingToggle');
+  const textarea = document.getElementById('composerInput');
+
+  const MOBILE_QUERY = '(max-width: 640px)';
+
+  function isMobile() {
+    return window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  // On mobile the drawer starts closed (collapsed); on desktop it starts open.
+  function initSidebarState() {
+    if (isMobile()) {
+      app.classList.add('collapsed');
+    } else {
+      app.classList.remove('collapsed');
+    }
+  }
+  initSidebarState();
+
+  function toggleSidebar() {
+    app.classList.toggle('collapsed');
+  }
+
+  sidebarToggle.addEventListener('click', toggleSidebar);
+  floatingToggle.addEventListener('click', toggleSidebar);
+  backdrop.addEventListener('click', () => {
+    app.classList.add('collapsed');
+  });
+
+  // Re-evaluate default state when crossing the mobile breakpoint,
+  // but don't fight a state the user explicitly chose within the same mode.
+  let lastIsMobile = isMobile();
+  window.addEventListener('resize', () => {
+    const nowMobile = isMobile();
+    if (nowMobile !== lastIsMobile) {
+      lastIsMobile = nowMobile;
+      initSidebarState();
+    }
+  });
+
+  // Adaptive input box: grow with content up to a max height, then scroll.
+  function autoResize() {
+    textarea.style.height = 'auto';
+    const max = 220;
+    const next = Math.min(textarea.scrollHeight, max);
+    textarea.style.height = next + 'px';
+  }
+  textarea.addEventListener('input', autoResize);
+
+  // window 'resize' alone can be unreliable across fullscreen transitions
+  // in some browsers, so also listen for fullscreenchange directly and
+  // watch the composer's own box size as a robust fallback.
+  window.addEventListener('resize', autoResize);
+  document.addEventListener('fullscreenchange', () => requestAnimationFrame(autoResize));
+  document.addEventListener('webkitfullscreenchange', () => requestAnimationFrame(autoResize));
+
+  if (window.ResizeObserver) {
+    const composerEl = document.querySelector('.composer');
+    const ro = new ResizeObserver(() => autoResize());
+    ro.observe(composerEl);
+  }
+
+  autoResize();
+
+  // Model switcher dropdown
+  const modelSelect = document.getElementById('modelSelect');
+  const modelLabel = document.getElementById('modelLabel');
+  const modelOptions = document.querySelectorAll('.model-option');
+
+  modelSelect.addEventListener('click', (e) => {
+    modelSelect.classList.toggle('open');
+    e.stopPropagation();
+  });
+
+  modelOptions.forEach((opt) => {
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name = opt.getAttribute('data-model');
+      modelLabel.textContent = name;
+      modelOptions.forEach((o) => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      modelSelect.classList.remove('open');
+    });
+  });
+
+  document.addEventListener('click', () => {
+    modelSelect.classList.remove('open');
+  });
+
+  // Enter to send (Shift+Enter for newline) — purely cosmetic here.
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      textarea.value = '';
+      autoResize();
+    }
+  });
+</script>
+</body>
+</html>
